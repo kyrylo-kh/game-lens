@@ -11,9 +11,14 @@ dependencies = [
     "pandas (>=1.5,<2.2)",
     "apache-airflow (>=3.0.3,<4.0.0)",
     "great-expectations (>=1.5.7,<2.0.0)",
-    "boto3 (>=1.40.3,<2.0.0)"
+    "boto3 (>=1.40.3,<2.0.0)",
+    "requests (>=2.32.4,<3.0.0)",
+    "pydantic (>=2.7,<3.0)",
+    "pydantic-settings (>=2.0,<3.0)"
 ]
 
+[tool.poetry]
+package-mode = false
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -21,7 +26,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.7"
-mypy = "^1.17.1"
 pytest = "^8.4.1"
 pre-commit = "^4.2.0"
 

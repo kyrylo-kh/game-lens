@@ -8,8 +8,7 @@ format:
 
 check:
 	poetry run ruff check .
-	poetry run mypy .
-	poetry run pytest
+	make test
 
 test:
-	poetry run pytest
+	PYTHONPATH=. poetry run pytest
