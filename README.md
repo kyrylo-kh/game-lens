@@ -23,3 +23,22 @@ GameLens is an open-source analytics platform for video game data — built for 
 ---
 
 **Full documentation and architecture:** [docs/](docs/)
+
+## **Quickstart: Running Locally**
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-org/game-lens.git
+cd game-lens
+```
+
+2. Install Python 3.12 and Poetry (if not installed):
+```bash
+pyenv install 3.12.11
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+3. Initialize the project:
+```bash
+make init
+```

@@ -1,0 +1,82 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# ---- Virtual Environments ----
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.venv
+
+# ---- Airflow ----
+# Airflow local configs and logs
+airflow/logs/
+airflow/unittests.cfg
+airflow/*.db
+airflow/airflow-webserver.pid
+
+# ---- Logs ----
+*.log
+logs/
+log/
+tmp.log
+*.out
+*.err
+
+# ---- Temporary files ----
+temp/
+tmp/
+*.tmp
+
+# ---- IDE & Editors ----
+.vscode/
+.idea/
+*.iml
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.ipynb~
+
+# ---- Docker ----
+*.pid
+docker-compose.override.yml
+.docker/
+.dockerignore
+
+# ---- OS-specific ----
+.DS_Store
+Thumbs.db
+
+# ---- Tests ----
+.coverage
+.tox/
+pytest_cache/
+.pytest_cache/
+.mypy_cache/
+.cache/
+htmlcov/
+coverage.xml
+
+# ---- Terraform ----
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# ---- Misc ----
+*.bak
+*.swp
+*.swo

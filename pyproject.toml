@@ -1,0 +1,31 @@
+[project]
+name = "game-lens"
+version = "0.1.0"
+description = "Data platform for unified gaming analytics"
+authors = [
+    {name = "Kyrylo Kholodenko",email = "kyrylo.kholodenko@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pandas (>=1.5,<2.2)",
+    "apache-airflow (>=3.0.3,<4.0.0)",
+    "great-expectations (>=1.5.7,<2.0.0)",
+    "boto3 (>=1.40.3,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.12.7"
+mypy = "^1.17.1"
+pytest = "^8.4.1"
+pre-commit = "^4.2.0"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+select = ["E", "F", "I"]
