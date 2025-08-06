@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 import requests
 from requests import Response
 
-from gamelens.models.steam import SteamAppListItem
 from gamelens.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -71,7 +70,7 @@ class SteamAPI:
                 time.sleep(self.backoff_factor * attempt)
         raise RuntimeError(f"Failed to fetch {url} after {self.max_retries} attempts")
 
-    def get_app_list(self, max_results: int = 50000) -> List[SteamAppListItem]:
+    def get_app_list(self, max_results: int = 50000) -> List[Dict[str, Any]]:
         """
         Fetch the full list of Steam apps (games only), handling pagination.
 
@@ -79,11 +78,11 @@ class SteamAPI:
             max_results: Maximum number of apps to fetch per request (default: 50,000).
 
         Returns:
-            List of SteamAppListItem models.
+            List[Dict]: List of app dictionaries containing appid, name, and other details.
         """
         url = f"{self.BASE_URL}/IStoreService/GetAppList/v1/"
         last_appid = 0
-        all_apps: List[SteamAppListItem] = []
+        all_apps: List[Dict[str, Any]] = []
 
         while True:
             params = {
@@ -99,7 +98,7 @@ class SteamAPI:
             data = self._request(url, params)
             response = data.get("response", {})
             apps = response.get("apps", [])
-            all_apps.extend(SteamAppListItem(**app) for app in apps)
+            all_apps.extend(apps)
 
             if not response.get("have_more_results"):
                 break
@@ -109,3 +108,19 @@ class SteamAPI:
 
         logger.info(f"Fetched total {len(all_apps)} apps from Steam.")
         return all_apps
+
+
+    def get_app_details(self, appid: int) -> Dict[str, Any]:
+        """
+        Fetch raw details for a single app.
+
+        Args:
+            appid: Steam application ID.
+
+        Returns:
+            Dict: Raw Steam AppDetails response.
+        """
+        url = f"{self.STORE_URL}/appdetails"
+        params = {"appids": appid}
+        data = self._request(url, params)
+        return data.get(str(appid), {})
