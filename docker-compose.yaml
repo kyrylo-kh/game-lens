@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: ./airflow/Dockerfile
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./gamelens:/opt/airflow/gamelens
+    command: webserver
+    env_file:
+      - airflow/.env
+    environment:
+      - PYTHONPATH=/opt/airflow
+    depends_on:
+      - postgres
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: ./airflow/Dockerfile
+    restart: always
+    depends_on:
+      - airflow-webserver
+      - postgres
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./gamelens:/opt/airflow/gamelens
+    command: scheduler
+    env_file:
+      - airflow/.env
+    environment:
+      - PYTHONPATH=/opt/airflow
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
