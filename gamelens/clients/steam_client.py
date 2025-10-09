@@ -33,12 +33,25 @@ class SteamAPI:
         backoff_factor: float = 1.5,
         timeout: int = 10,
         session: Optional[requests.Session] = None,
+        requests_delay: float = 0.5,
     ):
         self.api_key = api_key or settings.steam_api_key
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
         self.timeout = timeout
         self.session = session or requests.Session()
+        self.requests_delay = requests_delay
+
+        self.last_request_time = 0
+
+    def _apply_rate_limit(self) -> None:
+        """Apply rate limiting delay before making a request."""
+        if self.requests_delay <= 0:
+            return
+
+        elapsed = time.time() - self.last_request_time
+        if elapsed < self.requests_delay:
+            time.sleep(self.requests_delay)
 
     def _request(self, url: str, params: Dict[str, Any]) -> dict:
         """
@@ -55,8 +68,11 @@ class SteamAPI:
             RuntimeError: If all retry attempts fail.
             requests.RequestException: If a non-recoverable HTTP error occurs.
         """
+        self._apply_rate_limit()
+
         for attempt in range(1, self.max_retries + 1):
             try:
+                self.last_request_time = time.time()
                 resp: Response = self.session.get(url, params=params, timeout=self.timeout)
                 if resp.status_code == 429:  # Rate limited
                     wait = self.backoff_factor * attempt

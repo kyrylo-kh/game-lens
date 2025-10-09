@@ -10,10 +10,9 @@ from airflow.operators.python import get_current_context
 from airflow.stats import Stats
 from airflow.utils.dates import days_ago
 from gamelens.clients.steam_client import SteamAPI
+from gamelens.storage.constants import S3_STEAM_APP_LIST_TEMPLATE
 
 logger = logging.getLogger(__name__)
-
-S3_PATH_TEMPLATE = "s3://gamelens/bronze/steam/applist/year={year}/month={month}/day={day}/applist.jsonl.gz"
 
 with DAG(
     dag_id="steam__applist_load__bronze_snapshot",
@@ -40,10 +39,11 @@ with DAG(
         context = get_current_context()
         date = datetime.strptime(context["ds"], "%Y-%m-%d")
 
-        s3_path = S3_PATH_TEMPLATE.format(
+        s3_path = S3_STEAM_APP_LIST_TEMPLATE.format(
             year=date.year,
             month=f"{date.month:02}",
-            day=f"{date.day:02}"
+            day=f"{date.day:02}",
+            file_name="applist.jsonl.gz"
         )
 
         pd.DataFrame(apps).to_json(s3_path, orient="records", lines=True, compression="gzip")
