@@ -53,13 +53,14 @@ class SteamAPI:
         if elapsed < self.requests_delay:
             time.sleep(self.requests_delay)
 
-    def _request(self, url: str, params: Dict[str, Any]) -> dict:
+    def _request(self, url: str, params: Dict[str, Any], retry_on_unsuccessful: bool = False) -> dict:
         """
         Perform a GET request with retry and exponential backoff.
 
         Args:
             url: Full API endpoint URL.
             params: Query parameters for the request.
+            retry_on_unsuccessful: Whether to retry on unsuccessful responses (success=False in API response).
 
         Returns:
             Parsed JSON response as a Python dictionary.
@@ -73,14 +74,27 @@ class SteamAPI:
         for attempt in range(1, self.max_retries + 1):
             try:
                 self.last_request_time = time.time()
-                resp: Response = self.session.get(url, params=params, timeout=self.timeout)
+                if attempt > 1:
+                    resp: Response = requests.get(url, params=params, timeout=self.timeout)
+                else:
+                    resp: Response = self.session.get(url, params=params, timeout=self.timeout)
+
                 if resp.status_code == 429:  # Rate limited
                     wait = self.backoff_factor * attempt
                     logger.warning(f"Rate limited on {url}. Waiting {wait:.1f}s...")
                     time.sleep(wait)
                     continue
                 resp.raise_for_status()
-                return resp.json()
+                json_data = resp.json()
+
+                if retry_on_unsuccessful and not next(iter(json_data.values())).get("success"):
+                    wait = self.backoff_factor * attempt
+                    logger.warning(f"Unsuccessful response from {url}. Waiting {wait:.1f}s before retry...")
+                    time.sleep(wait)
+                    continue
+
+                return json_data
+
             except Exception as e:
                 logger.error(f"Request to {url} failed (attempt {attempt}): {e}")
                 time.sleep(self.backoff_factor * attempt)
@@ -126,7 +140,7 @@ class SteamAPI:
         return all_apps
 
 
-    def get_app_details(self, appid: int) -> Dict[str, Any]:
+    def get_app_details(self, appid: int, retry_on_unsuccessful: bool = False) -> Dict[str, Any]:
         """
         Fetch raw details for a single app.
 
@@ -138,5 +152,5 @@ class SteamAPI:
         """
         url = f"{self.STORE_URL}/appdetails"
         params = {"appids": appid}
-        data = self._request(url, params)
+        data = self._request(url, params, retry_on_unsuccessful)
         return data.get(str(appid), {})

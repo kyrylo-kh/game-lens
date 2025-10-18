@@ -33,4 +33,4 @@ pre-commit = "^4.2.0"
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-select = ["E", "F", "I"]
+lint.select = ["E", "F", "I"]

@@ -155,10 +155,6 @@ def steam_appdetails_full_load_dag():
                 logger.error(f"Error processing app {appid}: {e}")
                 total_error += 1
 
-            if total_error > 1000:
-                logger.error("Too many errors encountered, aborting processing.")
-                break
-
             if len(current_batch) >= PARTITION_SIZE:
                 _save_batch_to_s3(current_batch, date, batch_idx)
                 current_batch.clear()
