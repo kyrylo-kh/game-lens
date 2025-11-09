@@ -10,6 +10,7 @@ import pandas as pd
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowSkipException
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.stats import Stats
 from gamelens.clients.steam_client import SteamAPI
 from gamelens.storage.constants import S3_STEAM_APP_DETAILS_TEMPLATE
@@ -73,6 +74,7 @@ def _fetch_app_details(steam_client: SteamAPI, appid: int) -> Optional[Dict]:
     return None
 
 @dag(
+    dag_id="steam_appdetails_daily_update_dag",
     schedule="0 0 * * *",
     catchup=False,
     is_paused_upon_creation=False,
@@ -196,8 +198,14 @@ def steam_appdetails_daily_update_dag():
             file_name=""
         ))
 
+    trigger_transform = TriggerDagRunOperator(
+        task_id="trigger_transform",
+        trigger_dag_id="transform_appdetails_dag",
+        conf={"date": datetime_date.today().strftime("%Y-%m-%d")},
+    )
+
     appids = load_target_appids()
     stats = process_apps(appids)
-    combine_batches(stats)
+    combine_batches(stats) >> trigger_transform
 
 steam_appdetails_daily_update = steam_appdetails_daily_update_dag()
