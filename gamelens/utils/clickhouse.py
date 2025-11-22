@@ -6,29 +6,42 @@ from typing import Any, Dict, List, Optional
 
 from clickhouse_driver import Client
 
+from gamelens.settings import settings
+
 logger = logging.getLogger(__name__)
 
-# TODO: make singleton client
-def get_client() -> Client:
-    """Return configured ClickHouse client."""
-    host = os.getenv("CLICKHOUSE_HOST", "clickhouse")
-    port = int(os.getenv("CLICKHOUSE_PORT", 9000))
-    user = os.getenv("CLICKHOUSE_USER", "default")
-    password = os.getenv("CLICKHOUSE_PASSWORD", "")
-    database = os.getenv("CLICKHOUSE_DB", "gamelens")
 
-    client = Client(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        database=database,
-        settings={
-            "max_block_size": 200_000,
-            "strings_encoding": "utf8",
-        },
-    )
-    return client
+_client_instance = None
+def get_client() -> Client:
+    """Return configured ClickHouse client (singleton)."""
+    global _client_instance
+    if _client_instance is None:
+        host = os.getenv("CLICKHOUSE_HOST", "clickhouse")
+        port = int(os.getenv("CLICKHOUSE_PORT", 9000))
+        user = os.getenv("CLICKHOUSE_USER", "default")
+        password = os.getenv("CLICKHOUSE_PASSWORD", "")
+        if settings.environment != "local" and not password:
+            logger.warning(
+                "[ClickHouse] Empty password used for ClickHouse connection. "
+                "Set CLICKHOUSE_PASSWORD environment variable."
+            )
+            raise RuntimeError(
+                "CLICKHOUSE_PASSWORD environment variable must be set and non-empty "
+                "for ClickHouse connection."
+            )
+        database = os.getenv("CLICKHOUSE_DB", "gamelens")
+        _client_instance = Client(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+            settings={
+                "max_block_size": 200_000,
+                "strings_encoding": "utf8",
+            },
+        )
+    return _client_instance
 
 
 def exec_sql(sql: str, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -67,17 +80,20 @@ def insert_columnar(
     total_inserted = 0
     num_batches = math.ceil(n / batch_size)
 
+    if delete_snapshot_date:
+        if snapshot_date is None:
+            logger.error(f"[ClickHouse] delete_snapshot_date is True but snapshot_date is None for table {table}")
+            raise ValueError("delete_snapshot_date is True but snapshot_date is None")
+        client.execute(
+            f"ALTER TABLE {table} DELETE WHERE snapshot_date = toDate('{snapshot_date.strftime('%Y-%m-%d')}')",
+        )
+
     for i in range(num_batches):
         start = i * batch_size
         end = min(start + batch_size, n)
         chunk = [data[c][start:end] for c in columns]
 
         try:
-            if delete_snapshot_date:
-                client.execute(
-                    f"ALTER TABLE {table} DELETE WHERE snapshot_date = toDate('{snapshot_date.strftime('%Y-%m-%d')}')",
-                )
-
             client.execute(
                 f"INSERT INTO {table} ({', '.join(columns)}) VALUES",
                 chunk,

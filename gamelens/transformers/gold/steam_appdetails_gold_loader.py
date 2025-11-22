@@ -21,8 +21,8 @@ class SteamAppDetailsGoldLoader:
 
     def ensure_schema(self) -> None:
         """Create ClickHouse tables/views if not exist."""
-        logger.info("Ensuring ClickHouse schema...")
         schema_sql = (SQL_DIR / "ch_schema_gold.sql").read_text()
+        logger.info("Ensuring ClickHouse schema...")
         exec_sql(schema_sql)
 
     def run(self) -> None:
