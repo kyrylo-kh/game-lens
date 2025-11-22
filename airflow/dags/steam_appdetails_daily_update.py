@@ -13,15 +13,16 @@ from airflow.exceptions import AirflowSkipException
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.stats import Stats
 from gamelens.clients.steam_client import SteamAPI
+from gamelens.settings import settings
 from gamelens.storage.constants import S3_STEAM_APP_DETAILS_TEMPLATE
 from gamelens.utils.app_details import get_active_app_ids, get_app_details_for_date
-from gamelens.utils.common import remove_all_tmp_files_from_s3
+from gamelens.utils.common import S3_STORAGE_OPTIONS, remove_all_tmp_files_from_s3
 
 logger = logging.getLogger(__name__)
 
 
-PARTITION_SIZE = 1_000
-PROGRESS_LOG_INTERVAL = 500
+PARTITION_SIZE = 1_000 if settings.environment != 'local' else 10
+PROGRESS_LOG_INTERVAL = 500 if settings.environment != 'local' else 10
 FILE_NAME = "appdetails"
 MAX_CONSECUTIVE_ERRORS = 50
 
@@ -37,11 +38,11 @@ def _save_batch_to_s3(results: List[Dict], date: datetime, batch_idx: int) -> No
         file_name=filename
     )
     df = pd.DataFrame(results)
-    df.to_json(s3_path, orient="records", lines=True, compression="gzip")
+    df.to_json(s3_path, orient="records", lines=True, compression="gzip", storage_options=S3_STORAGE_OPTIONS)
     logger.info(f"Saved batch {batch_idx}: {s3_path} ({len(results)} apps)")
 
 def _get_start_batch_index(date: datetime) -> int:
-    s3 = boto3.client("s3")
+    s3 = boto3.client("s3", endpoint_url=settings.aws_endpoint_url)
 
     prefix = f"bronze/steam/appdetails/year={date.year}/month={date.month:02}/day={date.day:02}/"
     resp = s3.list_objects_v2(Bucket="gamelens", Prefix=prefix)
@@ -80,9 +81,9 @@ def _fetch_app_details(steam_client: SteamAPI, appid: int) -> Optional[Dict]:
     is_paused_upon_creation=False,
     max_active_runs=1,
     default_args={
-        "retries": 3,
+        "retries": 3 if settings.environment != 'local' else 1,
         "retry_exponential_backoff": True,
-        "retry_delay": timedelta(seconds=10)
+        "retry_delay": timedelta(seconds=10) if settings.environment != 'local' else timedelta(seconds=1)
     },
     tags=["steam", "incremental", "nightly"],
     start_date=pd.Timestamp("2025-10-18"),
@@ -109,7 +110,10 @@ def steam_appdetails_daily_update_dag():
             logger.info("No app IDs to process, skipping DAG run.")
             raise AirflowSkipException("App IDs list is empty")
 
-        logger.info(f"Selected {len(appids)} app_ids for fetch")
+        if settings.environment == 'local':
+            appids = set(list(appids)[:20])
+
+        logger.info(f"Selected {len(appids)} app_ids for fetch | {settings.environment}")
         return appids
 
     @task(retry_delay=timedelta(minutes=10))
@@ -184,7 +188,8 @@ def steam_appdetails_daily_update_dag():
                 ),
                 orient="records",
                 lines=True,
-                compression="gzip"
+                compression="gzip",
+                storage_options=S3_STORAGE_OPTIONS
             )
         except Exception as e:
             logger.error(f"Error saving combined file for {date.strftime('%Y-%m-%d')}: {e}")
@@ -201,7 +206,7 @@ def steam_appdetails_daily_update_dag():
     trigger_transform = TriggerDagRunOperator(
         task_id="trigger_transform",
         trigger_dag_id="transform_appdetails_dag",
-        conf={"date": datetime_date.today().strftime("%Y-%m-%d")},
+        conf={"mode": "daily"},
     )
 
     appids = load_target_appids()

@@ -10,8 +10,10 @@ from airflow.decorators import dag, task
 from airflow.operators.python import get_current_context
 from airflow.stats import Stats
 from gamelens.clients.steam_client import SteamAPI
+from gamelens.settings import settings
 from gamelens.storage.constants import S3_STEAM_APP_DETAILS_TEMPLATE, S3_STEAM_APP_LIST_TEMPLATE
 from gamelens.utils.app_details import get_unique_app_ids_from_all_app_details
+from gamelens.utils.common import S3_STORAGE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ def steam_appdetails_full_load_dag():
 
         logger.info(f"Loading app list from: {s3_path}")
 
-        df = pd.read_json(s3_path, compression="gzip", lines=True)
+        df = pd.read_json(s3_path, compression="gzip", lines=True, storage_options=S3_STORAGE_OPTIONS)
 
         if "applist" in df.columns and "apps" in df.iloc[0]["applist"]:
             apps = df.iloc[0]["applist"]["apps"]
@@ -93,12 +95,12 @@ def steam_appdetails_full_load_dag():
         )
 
         df = pd.DataFrame(results)
-        df.to_json(s3_path, orient="records", lines=True, compression="gzip")
+        df.to_json(s3_path, orient="records", lines=True, compression="gzip", storage_options=S3_STORAGE_OPTIONS)
 
         logger.info(f"Saved batch {batch_idx}: {s3_path} ({len(results)} apps)")
 
     def get_start_batch_index(date: datetime) -> int:
-        s3 = boto3.client("s3")
+        s3 = boto3.client("s3", endpoint_url=settings.aws_endpoint_url)
         objects = s3.list_objects_v2(
             Bucket="gamelens",
             Prefix=f"bronze/steam/appdetails/year={date.year}/month={date.month:02}/day={date.day:02}/"

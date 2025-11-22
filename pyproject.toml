@@ -17,7 +17,8 @@ dependencies = [
     "boto3 (==1.39.11)",
     "duckdb (>=1.4.1,<2.0.0)",
     "polars (>=1.35.2,<2.0.0)",
-    "pyarrow (>=22.0.0,<23.0.0)"
+    "pyarrow (>=22.0.0,<23.0.0)",
+    "clickhouse-driver (>=0.2.9,<0.3.0)"
 ]
 
 [tool.poetry]

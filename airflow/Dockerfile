@@ -10,4 +10,8 @@ RUN poetry export --without-hashes -f requirements.txt -o requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /opt/airflow
+COPY gamelens /opt/airflow/gamelens
+COPY .env /opt/airflow/.env
+COPY airflow/dags /opt/airflow/airflow/dags
+
+ENV PYTHONPATH=/opt/airflow
