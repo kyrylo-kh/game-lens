@@ -1,46 +1,75 @@
-version: "3.8"
+x-airflow-common: &airflow-common
+  image: gamelens-airflow:latest # Build this image using airflow/Dockerfile
+  restart: always
+  env_file:
+    - airflow/.env
+  environment:
+    - PYTHONPATH=/opt/airflow
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./gamelens:/opt/airflow/gamelens
+  depends_on:
+    - postgres
+    - clickhouse
 
 services:
   airflow-webserver:
-    build:
-      context: .
-      dockerfile: ./airflow/Dockerfile
-    restart: always
+    <<: *airflow-common
+    command: webserver
     ports:
       - "8080:8080"
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./gamelens:/opt/airflow/gamelens
-    command: webserver
-    env_file:
-      - airflow/.env
-    environment:
-      - PYTHONPATH=/opt/airflow
-    depends_on:
-      - postgres
 
   airflow-scheduler:
-    build:
-      context: .
-      dockerfile: ./airflow/Dockerfile
-    restart: always
-    depends_on:
-      - airflow-webserver
-      - postgres
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./gamelens:/opt/airflow/gamelens
+    <<: *airflow-common
     command: scheduler
-    env_file:
-      - airflow/.env
-    environment:
-      - PYTHONPATH=/opt/airflow
 
   postgres:
     image: postgres:13
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+    env_file:
+      - .env
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    restart: always
+    ports:
+      - "8123:8123" # HTTP API
+      - "9002:9000" # Native protocol
+    env_file:
+      - .env
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    restart: always
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - clickhouse
+    command: superset run -h 0.0.0.0 -p 8088
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001" --address ":9000"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  minio_data:

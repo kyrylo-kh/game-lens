@@ -31,12 +31,23 @@ def connect_duck(
         ).fetchone()
 
         if not secret_exists:
+            options = [
+                "TYPE s3",
+                f"KEY_ID '{settings.aws_access_key_id}'",
+                f"SECRET '{settings.aws_secret_access_key}'",
+                f"REGION '{settings.aws_region}'",
+            ]
+            if settings.aws_endpoint_url:
+                endpoint = settings.aws_endpoint_url.replace('http://', '').replace('https://', '')
+                options.append(f"ENDPOINT '{endpoint}'")
+                options.append("USE_SSL false")
+                options.append("URL_STYLE 'path'")
+
+            options_str = ",\n                    ".join(options)
+
             connection.execute(f"""
                 CREATE SECRET {secret_name} (
-                    TYPE s3,
-                    KEY_ID '{settings.aws_access_key_id}',
-                    SECRET '{settings.aws_secret_access_key}',
-                    REGION '{settings.aws_region}'
+                    {options_str}
                 );
             """)
 

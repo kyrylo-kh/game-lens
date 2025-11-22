@@ -3,6 +3,7 @@ from typing import List, Set
 import pandas as pd
 
 from gamelens.storage.constants import S3_STEAM_ACTIVE_APP_IDS_LATEST, S3_STEAM_APP_DETAILS_TEMPLATE
+from gamelens.utils.common import S3_STORAGE_OPTIONS
 from gamelens.utils.duckdb import connect_duck
 
 
@@ -29,7 +30,9 @@ def get_active_app_ids() -> List[int]:
     Fetch active app IDs from the latest active_app_ids parquet file in S3.
     """
 
-    df = pd.read_parquet(S3_STEAM_ACTIVE_APP_IDS_LATEST, columns=["appid"])
+    df = pd.read_parquet(
+        S3_STEAM_ACTIVE_APP_IDS_LATEST, columns=["appid"], storage_options=S3_STORAGE_OPTIONS
+    )
     return df["appid"].dropna().astype("int64").tolist()
 
 

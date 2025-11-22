@@ -1,14 +1,19 @@
+
 from datetime import date, datetime, timedelta
 from typing import Any, List
 
-from airflow.decorators import dag, task
+import s3fs
+
+from airflow import DAG
+from airflow.decorators import task
+from airflow.exceptions import AirflowSkipException
 from airflow.models.param import Param
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from gamelens.transformers.steam_appdetails import AppDetailsTransformerPolars
+from gamelens.storage.constants import S3_STEAM_APP_DETAILS_SILVER_TEMPLATE
+from gamelens.transformers.gold.steam_appdetails_gold_loader import SteamAppDetailsGoldLoader
+from gamelens.utils.common import S3_STORAGE_OPTIONS
 
-
-@dag(
-    dag_id="transform_appdetails_dag",
+with DAG(
+    dag_id="steam_appdetails_transform_gold",
     start_date=datetime(2025, 10, 19),
     catchup=False,
     schedule=None,
@@ -24,19 +29,14 @@ from gamelens.transformers.steam_appdetails import AppDetailsTransformerPolars
             description='Start date for the date range (only for custom)'
         ),
         'end_date': Param(
-            default='2025-11-25',
             format='date',
             description='End date for the date range (only for custom)'
         ),
     },
     max_active_runs=3,
     max_active_tasks=3,
-    tags=["steam", "silver", "transform"],
-)
-def steam_appdetails_transform_silver():
-    """
-    Loads Steam appdetails data from bronze layer, transforms it, validates and saves to silver layer.
-    """
+    tags=["steam", "gold"],
+) as dag:
 
     @task(task_display_name='Generate dates')
     def get_date_range(
@@ -56,22 +56,24 @@ def steam_appdetails_transform_silver():
             for i in range((end - start).days + 1)
         ]
 
-    @task(task_display_name='Transform appdetails into Silver layer')
-    def transform(process_date: date):
-        transformer = AppDetailsTransformerPolars(process_date)
-        transformer.run()
+    @task(task_display_name='Load to Gold')
+    def gold_load(process_date: date):
+        path = S3_STEAM_APP_DETAILS_SILVER_TEMPLATE.format(
+            year=process_date.year,
+            month=f"{process_date.month:02d}",
+            day=f"{process_date.day:02d}",
+            file_name="game_daily.parquet"
+        )
+        fs = s3fs.S3FileSystem(**S3_STORAGE_OPTIONS)
+        if not fs.exists(path):
+            raise AirflowSkipException(f"No Silver for {process_date}")
 
-    trigger_gold_loading = TriggerDagRunOperator(
-        task_id="trigger_gold",
-        trigger_dag_id="steam_appdetails_transform_gold",
-        conf="{{ params | tojson }}",
-    )
+        loader = SteamAppDetailsGoldLoader(process_date)
+        loader.run()
 
     dates = get_date_range(
         start_date='{{ params.start_date }}',
         end_date='{{ params.end_date }}',
     )
 
-    transform.expand(process_date=dates) >> trigger_gold_loading
-
-steam_appdetails_transform_silver()
+    gold_load.expand(process_date=dates)

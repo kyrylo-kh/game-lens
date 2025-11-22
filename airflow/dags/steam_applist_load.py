@@ -11,6 +11,7 @@ from airflow.stats import Stats
 from airflow.utils.dates import days_ago
 from gamelens.clients.steam_client import SteamAPI
 from gamelens.storage.constants import S3_STEAM_APP_LIST_TEMPLATE
+from gamelens.utils.common import S3_STORAGE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,13 @@ with DAG(
             file_name="applist.jsonl.gz"
         )
 
-        pd.DataFrame(apps).to_json(s3_path, orient="records", lines=True, compression="gzip")
+        pd.DataFrame(apps).to_json(
+            s3_path,
+            orient="records",
+            lines=True,
+            compression="gzip",
+            storage_options=S3_STORAGE_OPTIONS,
+        )
         logger.info(f"Saved applist: {s3_path} rows={len(apps)}")
 
         Stats.incr("steam.applist.rows", count=len(apps))
